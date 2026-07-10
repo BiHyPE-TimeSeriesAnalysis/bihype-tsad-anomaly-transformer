@@ -1,12 +1,20 @@
 import os
 import argparse
+import random
 
 from torch.backends import cudnn
 from utils.utils import *
 
 from solver import Solver
 
+def set_seed(seed):
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
 
+    torch.cuda.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)
+    
 def str2bool(v):
     return v.lower() in ('true')
 
@@ -31,7 +39,7 @@ if __name__ == '__main__':
     parser.add_argument('--lr', type=float, default=1e-4)
     parser.add_argument('--num_epochs', type=int, default=10)
     parser.add_argument('--k', type=int, default=3)
-    parser.add_argument('--win_size', type=int, default=100)
+    parser.add_argument('--win_size', type=int, default=64)
     parser.add_argument('--input_c', type=int, default=38)
     parser.add_argument('--output_c', type=int, default=38)
     parser.add_argument('--batch_size', type=int, default=1024)
@@ -44,6 +52,8 @@ if __name__ == '__main__':
 
     config = parser.parse_args()
 
+    set_seed(43)
+    
     args = vars(config)
     print('------------ Options -------------')
     for k, v in sorted(args.items()):

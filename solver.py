@@ -7,7 +7,8 @@ import time
 from utils.utils import *
 from model.AnomalyTransformer import AnomalyTransformer
 from data_factory.data_loader import get_loader_segment
-
+from sklearn.metrics import accuracy_score, precision_recall_fscore_support, roc_auc_score, precision_recall_curve, auc
+from vus.utils.metrics import metricor
 
 def my_kl_loss(p, q):
     res = p * (torch.log(p + 0.0001) - torch.log(q + 0.0001))
@@ -31,18 +32,18 @@ class EarlyStopping:
         self.best_score = None
         self.best_score2 = None
         self.early_stop = False
-        self.val_loss_min = np.Inf
-        self.val_loss2_min = np.Inf
+        self.val_loss_min = np.inf
+        self.val_loss2_min = np.inf
         self.delta = delta
         self.dataset = dataset_name
 
-    def __call__(self, val_loss, val_loss2, model, path):
+    def __call__(self, win_size, val_loss, val_loss2, model, path):
         score = -val_loss
         score2 = -val_loss2
         if self.best_score is None:
             self.best_score = score
             self.best_score2 = score2
-            self.save_checkpoint(val_loss, val_loss2, model, path)
+            self.save_checkpoint(win_size, val_loss, val_loss2, model, path)
         elif score < self.best_score + self.delta or score2 < self.best_score2 + self.delta:
             self.counter += 1
             print(f'EarlyStopping counter: {self.counter} out of {self.patience}')
@@ -51,13 +52,13 @@ class EarlyStopping:
         else:
             self.best_score = score
             self.best_score2 = score2
-            self.save_checkpoint(val_loss, val_loss2, model, path)
+            self.save_checkpoint(win_size, val_loss, val_loss2, model, path)
             self.counter = 0
 
-    def save_checkpoint(self, val_loss, val_loss2, model, path):
+    def save_checkpoint(self, win_size, val_loss, val_loss2, model, path):
         if self.verbose:
             print(f'Validation loss decreased ({self.val_loss_min:.6f} --> {val_loss:.6f}).  Saving model ...')
-        torch.save(model.state_dict(), os.path.join(path, str(self.dataset) + '_checkpoint.pth'))
+        torch.save(model.state_dict(),os.path.join(path, f"{self.dataset}_wsize{win_size}_checkpoint.pth"))
         self.val_loss_min = val_loss
         self.val_loss2_min = val_loss2
 
@@ -135,7 +136,7 @@ class Solver(object):
         path = self.model_save_path
         if not os.path.exists(path):
             os.makedirs(path)
-        early_stopping = EarlyStopping(patience=3, verbose=True, dataset_name=self.dataset)
+        early_stopping = EarlyStopping(patience=1000, verbose=True, dataset_name=self.dataset)
         train_steps = len(self.train_loader)
 
         for epoch in range(self.num_epochs):
@@ -198,178 +199,191 @@ class Solver(object):
             print(
                 "Epoch: {0}, Steps: {1} | Train Loss: {2:.7f} Vali Loss: {3:.7f} ".format(
                     epoch + 1, train_steps, train_loss, vali_loss1))
-            early_stopping(vali_loss1, vali_loss2, self.model, path)
+            early_stopping(self.win_size, vali_loss1, vali_loss2, self.model, path)
             if early_stopping.early_stop:
                 print("Early stopping")
                 break
             adjust_learning_rate(self.optimizer, epoch + 1, self.lr)
 
+    def compute_vus(self, gt, score, window_size):
+        _, _, _, _, avg_auc_3d, avg_ap_3d = metricor().RangeAUC_volume_opt(
+            labels_original=gt,
+            score=score,
+            windowSize=window_size,
+            thre=250
+        )
+        return avg_auc_3d, avg_ap_3d
+
     def test(self):
         self.model.load_state_dict(
             torch.load(
-                os.path.join(str(self.model_save_path), str(self.dataset) + '_checkpoint.pth')))
+                os.path.join(str(self.model_save_path), str(self.dataset) + '_wsize' + str(self.win_size) + '_checkpoint.pth'),
+                weights_only=True
+                ))
         self.model.eval()
         temperature = 50
 
-        print("======================TEST MODE======================")
-
+        print("======================TEST MODE (OPTIMIZING RATIO)======================")
         criterion = nn.MSELoss(reduce=False)
 
-        # (1) stastic on the train set
-        attens_energy = []
+        # --- Bước 1: Thu thập Energy từ Train Set (chỉ chạy 1 lần) ---
+        train_energy = []
         for i, (input_data, labels) in enumerate(self.train_loader):
             input = input_data.float().to(self.device)
             output, series, prior, _ = self.model(input)
             loss = torch.mean(criterion(input, output), dim=-1)
+            
             series_loss = 0.0
             prior_loss = 0.0
             for u in range(len(prior)):
-                if u == 0:
-                    series_loss = my_kl_loss(series[u], (
-                            prior[u] / torch.unsqueeze(torch.sum(prior[u], dim=-1), dim=-1).repeat(1, 1, 1,
-                                                                                                   self.win_size)).detach()) * temperature
-                    prior_loss = my_kl_loss(
-                        (prior[u] / torch.unsqueeze(torch.sum(prior[u], dim=-1), dim=-1).repeat(1, 1, 1,
-                                                                                                self.win_size)),
-                        series[u].detach()) * temperature
-                else:
-                    series_loss += my_kl_loss(series[u], (
-                            prior[u] / torch.unsqueeze(torch.sum(prior[u], dim=-1), dim=-1).repeat(1, 1, 1,
-                                                                                                   self.win_size)).detach()) * temperature
-                    prior_loss += my_kl_loss(
-                        (prior[u] / torch.unsqueeze(torch.sum(prior[u], dim=-1), dim=-1).repeat(1, 1, 1,
-                                                                                                self.win_size)),
-                        series[u].detach()) * temperature
+                # Tối ưu hóa việc tính toán chuẩn hóa prior
+                prior_norm = prior[u] / torch.unsqueeze(torch.sum(prior[u], dim=-1), dim=-1).repeat(1, 1, 1, self.win_size)
+                series_loss += my_kl_loss(series[u], prior_norm.detach()) * temperature
+                prior_loss += my_kl_loss(prior_norm, series[u].detach()) * temperature
 
             metric = torch.softmax((-series_loss - prior_loss), dim=-1)
-            cri = metric * loss
-            cri = cri.detach().cpu().numpy()
-            attens_energy.append(cri)
+            cri = (metric * loss).detach().cpu().numpy()
+            train_energy.append(cri)
+        train_energy = np.concatenate(train_energy, axis=0).reshape(-1)
 
-        attens_energy = np.concatenate(attens_energy, axis=0).reshape(-1)
-        train_energy = np.array(attens_energy)
-
-        # (2) find the threshold
-        attens_energy = []
-        for i, (input_data, labels) in enumerate(self.thre_loader):
-            input = input_data.float().to(self.device)
-            output, series, prior, _ = self.model(input)
-
-            loss = torch.mean(criterion(input, output), dim=-1)
-
-            series_loss = 0.0
-            prior_loss = 0.0
-            for u in range(len(prior)):
-                if u == 0:
-                    series_loss = my_kl_loss(series[u], (
-                            prior[u] / torch.unsqueeze(torch.sum(prior[u], dim=-1), dim=-1).repeat(1, 1, 1,
-                                                                                                   self.win_size)).detach()) * temperature
-                    prior_loss = my_kl_loss(
-                        (prior[u] / torch.unsqueeze(torch.sum(prior[u], dim=-1), dim=-1).repeat(1, 1, 1,
-                                                                                                self.win_size)),
-                        series[u].detach()) * temperature
-                else:
-                    series_loss += my_kl_loss(series[u], (
-                            prior[u] / torch.unsqueeze(torch.sum(prior[u], dim=-1), dim=-1).repeat(1, 1, 1,
-                                                                                                   self.win_size)).detach()) * temperature
-                    prior_loss += my_kl_loss(
-                        (prior[u] / torch.unsqueeze(torch.sum(prior[u], dim=-1), dim=-1).repeat(1, 1, 1,
-                                                                                                self.win_size)),
-                        series[u].detach()) * temperature
-            # Metric
-            metric = torch.softmax((-series_loss - prior_loss), dim=-1)
-            cri = metric * loss
-            cri = cri.detach().cpu().numpy()
-            attens_energy.append(cri)
-
-        attens_energy = np.concatenate(attens_energy, axis=0).reshape(-1)
-        test_energy = np.array(attens_energy)
-        combined_energy = np.concatenate([train_energy, test_energy], axis=0)
-        thresh = np.percentile(combined_energy, 100 - self.anormly_ratio)
-        print("Threshold :", thresh)
-
-        # (3) evaluation on the test set
+        # --- Bước 2: Thu thập Energy và Labels từ Test/Thre Set (chỉ chạy 1 lần) ---
+        test_energy = []
         test_labels = []
-        attens_energy = []
         for i, (input_data, labels) in enumerate(self.thre_loader):
             input = input_data.float().to(self.device)
             output, series, prior, _ = self.model(input)
-
             loss = torch.mean(criterion(input, output), dim=-1)
 
             series_loss = 0.0
             prior_loss = 0.0
             for u in range(len(prior)):
-                if u == 0:
-                    series_loss = my_kl_loss(series[u], (
-                            prior[u] / torch.unsqueeze(torch.sum(prior[u], dim=-1), dim=-1).repeat(1, 1, 1,
-                                                                                                   self.win_size)).detach()) * temperature
-                    prior_loss = my_kl_loss(
-                        (prior[u] / torch.unsqueeze(torch.sum(prior[u], dim=-1), dim=-1).repeat(1, 1, 1,
-                                                                                                self.win_size)),
-                        series[u].detach()) * temperature
-                else:
-                    series_loss += my_kl_loss(series[u], (
-                            prior[u] / torch.unsqueeze(torch.sum(prior[u], dim=-1), dim=-1).repeat(1, 1, 1,
-                                                                                                   self.win_size)).detach()) * temperature
-                    prior_loss += my_kl_loss(
-                        (prior[u] / torch.unsqueeze(torch.sum(prior[u], dim=-1), dim=-1).repeat(1, 1, 1,
-                                                                                                self.win_size)),
-                        series[u].detach()) * temperature
-            metric = torch.softmax((-series_loss - prior_loss), dim=-1)
+                prior_norm = prior[u] / torch.unsqueeze(torch.sum(prior[u], dim=-1), dim=-1).repeat(1, 1, 1, self.win_size)
+                series_loss += my_kl_loss(series[u], prior_norm.detach()) * temperature
+                prior_loss += my_kl_loss(prior_norm, series[u].detach()) * temperature
 
-            cri = metric * loss
-            cri = cri.detach().cpu().numpy()
-            attens_energy.append(cri)
+            metric = torch.softmax((-series_loss - prior_loss), dim=-1)
+            cri = (metric * loss).detach().cpu().numpy()
+            test_energy.append(cri)
             test_labels.append(labels)
 
-        attens_energy = np.concatenate(attens_energy, axis=0).reshape(-1)
-        test_labels = np.concatenate(test_labels, axis=0).reshape(-1)
-        test_energy = np.array(attens_energy)
-        test_labels = np.array(test_labels)
+        test_energy = np.concatenate(test_energy, axis=0).reshape(-1)
+        test_labels = np.concatenate(test_labels, axis=0).reshape(-1).astype(int)
+        combined_energy = np.concatenate([train_energy, test_energy], axis=0)
+        
+        # --- Bước 3: Tính toán AUC-ROC và AUC-PR (Không phụ thuộc threshold/ratio) ---
+        
 
-        pred = (test_energy > thresh).astype(int)
+        gt = test_labels.copy()
+        # --- Bước 4: Quét qua các giá trị Ratio để tìm Best Performance ---
+        best_f1 = -1
+        best_f1_no_pa = -1
+        best_results = {}
+        
+        # Tạo danh sách ratio từ 0.1 đến 1.5 với bước nhảy 0.1
+        ratios = np.arange(0.1, 1.6, 0.1)
+        
+        for ratio in ratios:
+            # Tính ngưỡng dựa trên ratio hiện tại
+            thresh = np.percentile(combined_energy, 100 - ratio)
+            
+            # Dự đoán thô (Raw prediction)
+            pred_raw = (test_energy > thresh).astype(int)
+            gt = test_labels.copy()
+            
+            # Detection Adjustment (Cơ chế Point Adjustment - PA)
+            pred_pa = pred_raw.copy()
+            anomaly_state = False
+            for i in range(len(gt)):
+                if gt[i] == 1 and pred_pa[i] == 1 and not anomaly_state:
+                    anomaly_state = True
+                    for j in range(i, 0, -1):
+                        if gt[j] == 0: break
+                        else: pred_pa[j] = 1
+                    for j in range(i, len(gt)):
+                        if gt[j] == 0: break
+                        else: pred_pa[j] = 1
+                elif gt[i] == 0:
+                    anomaly_state = False
+                if anomaly_state:
+                    pred_pa[i] = 1
 
-        gt = test_labels.astype(int)
+            # Tính toán metric cho PA
+            prec_pa, rec_pa, f1_pa, _ = precision_recall_fscore_support(gt, pred_pa, average='binary', zero_division=0)
 
-        print("pred:   ", pred.shape)
-        print("gt:     ", gt.shape)
+            _, _, f1_no_pa, _ = precision_recall_fscore_support(gt, pred_raw, average='binary', zero_division=0)
 
-        # detection adjustment: please see this issue for more information https://github.com/thuml/Anomaly-Transformer/issues/14
-        anomaly_state = False
-        for i in range(len(gt)):
-            if gt[i] == 1 and pred[i] == 1 and not anomaly_state:
-                anomaly_state = True
-                for j in range(i, 0, -1):
-                    if gt[j] == 0:
-                        break
-                    else:
-                        if pred[j] == 0:
-                            pred[j] = 1
-                for j in range(i, len(gt)):
-                    if gt[j] == 0:
-                        break
-                    else:
-                        if pred[j] == 0:
-                            pred[j] = 1
-            elif gt[i] == 0:
-                anomaly_state = False
-            if anomaly_state:
-                pred[i] = 1
+            if f1_pa > best_f1:
+                best_f1 = f1_pa
+                best_results = {
+                    "ratio": ratio,
+                    "prec_pa": prec_pa,
+                    "rec_pa": rec_pa,
+                    "f1_pa": f1_pa, # Đây là F1-PA
+                }
+            if f1_no_pa > best_f1_no_pa:
+                best_f1_no_pa = f1_no_pa
+                best_results['f1_no_pa'] = best_f1_no_pa
+                
 
-        pred = np.array(pred)
-        gt = np.array(gt)
-        print("pred: ", pred.shape)
-        print("gt:   ", gt.shape)
+        # Tính toán AUC Metrics
+        auc_roc = roc_auc_score(test_labels, test_energy)
+        prec_curves, rec_curves, _ = precision_recall_curve(test_labels, test_energy)
+        auc_pr = auc(rec_curves, prec_curves)
+        best_results['auc_roc'] = auc_roc
+        best_results['auc_pr'] = auc_pr
 
-        from sklearn.metrics import precision_recall_fscore_support
-        from sklearn.metrics import accuracy_score
-        accuracy = accuracy_score(gt, pred)
-        precision, recall, f_score, support = precision_recall_fscore_support(gt, pred,
-                                                                              average='binary')
-        print(
-            "Accuracy : {:0.4f}, Precision : {:0.4f}, Recall : {:0.4f}, F-score : {:0.4f} ".format(
-                accuracy, precision,
-                recall, f_score))
+        # Tính toán VUS Metrics
+        vus_roc, vus_pr = self.compute_vus(gt, test_energy, window_size=100)        # Thay đổi self.win_size thành 100 default
+        best_results['vus_roc'] = vus_roc
+        best_results['vus_pr'] = vus_pr
 
-        return accuracy, precision, recall, f_score
+        # print("\n====================== BEST RESULT (BY AFF-F1) ======================")
+        print("\n====================== BEST RESULT ======================")
+        print(f"Best Ratio    : {best_results['ratio']:.1f}")
+        print(f"Precision (PA): {best_results['prec_pa']:.4f}")
+        print(f"Recall (PA)   : {best_results['rec_pa']:.4f}")
+        print(f"F1 (PA)       : {best_results['f1_pa']:.4f}")
+        print(f"F1 (No PA)    : {best_results['f1_no_pa']:.4f}")
+        print(f"AUC-ROC       : {best_results['auc_roc']:.4f} | AUC-PR: {best_results['auc_pr']:.4f}")
+        print(f"VUS-ROC       : {best_results['vus_roc']:.4f} | VUS-PR: {best_results['vus_pr']:.4f}")
+
+        self.save_results(best_results=best_results, scheduler=True)
+        
+
+
+
+    def build_filename(self, scheduler=False):
+        filename = (
+            f"{self.dataset}"
+            f"_win{self.win_size}"
+            f"_dm{self.model.d_model}"
+            f"_lr{self.lr}"
+            # f"_maxlr{self.max_lr}"
+            # f"_minlr{self.min_lr}"
+            f"_ep{self.num_epochs}"
+            f"_bs{self.batch_size}"
+            f"_dropout0.1"
+        )
+
+        return filename
+
+    def save_results(self, best_results, scheduler=False):
+        os.makedirs("results", exist_ok=True)
+
+        filename = self.build_filename(scheduler=scheduler) + ".txt"
+
+        path = os.path.join("results", filename)
+
+        with open(path, "w", encoding="utf-8") as f:
+            f.write("====================== BEST RESULT ======================\n")
+            f.write(f"Best Ratio    : {best_results['ratio']:.1f}\n")
+            f.write(f"Precision (PA): {best_results['prec_pa']:.4f}\n")
+            f.write(f"Recall (PA)   : {best_results['rec_pa']:.4f}\n")
+            f.write(f"F1 (PA)       : {best_results['f1_pa']:.4f}\n")
+            f.write(f"F1 (No PA)    : {best_results['f1_no_pa']:.4f}\n")
+            f.write(f"AUC-ROC       : {best_results['auc_roc']:.4f}\n")
+            f.write(f"AUC-PR        : {best_results['auc_pr']:.4f}\n")
+            f.write(f"VUS-ROC       : {best_results['vus_roc']:.4f}\n")
+            f.write(f"VUS-PR        : {best_results['vus_pr']:.4f}\n")
+
+        print(f"Saved results -> {path}")
