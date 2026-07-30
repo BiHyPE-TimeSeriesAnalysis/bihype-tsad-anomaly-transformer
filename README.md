@@ -14,7 +14,8 @@ This repository provides an implementation/reproduction of the baseline **[Anoma
 
 1. Install Python 3.6, PyTorch >= 1.4.0. 
 2. You can obtain five benchmarks from [Google Drive](https://drive.google.com/drive/folders/1PKHJIi2--liygyXCXiGmgj_RBbDtz6DD?usp=sharing). **All the datasets are well pre-processed by the authors of Anomaly Transformer**. You can download this data, then create the folder of dataset in the source code (valid dataset directory example: dataset/MSL, dataset/PSM, dataset/SMAP, dataset/SWaT, dataset/SMD).
-3. Train and evaluate. We provide the experiment scripts of all benchmarks under the folder `./scripts`. You can reproduce the experiment results as follows:
+3. Checkpoint: There are two types of checkpoint (1: For original, 2: For BiHyPE version on three random seeds), as summarized in [AnomalyTransformer_Checkpoints](https://drive.google.com/drive/folders/1U-ChjeNYKalNk6nODQ2eDtd_KPLba1F0?usp=drive_link).
+4. Train and evaluate. We provide the experiment scripts of all benchmarks under the folder `./scripts`. You can reproduce the experiment results as follows:
 ```bash
 bash ./scripts/SMD.sh
 bash ./scripts/MSL.sh
