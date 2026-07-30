@@ -1,52 +1,40 @@
-# Anomaly-Transformer (ICLR 2022 Spotlight)
-Anomaly Transformer: Time Series Anomaly Detection with Association Discrepancy
+# BiHyPE: Binary-based Hybrid Positional Encoding for Time-series Analysis
 
-Unsupervised detection of anomaly points in time series is a challenging problem, which requires the model to learn informative representation and derive a distinguishable criterion. In this paper, we propose the Anomaly Transformer in these three folds:
+[![Python 3.6 (Legacy)](https://img.shields.io/badge/Python-3.6-yellow?style=flat&logo=python&logoColor=white)](https://www.python.org/)
+[![PyTorch >=1.4.0](https://img.shields.io/badge/PyTorch-%3E%3D1.4.0%2C_%3C%3D1.10.2-red?style=flat&logo=pytorch&logoColor=white)](https://pytorch.org/)
 
-- An inherent distinguishable criterion as **Association Discrepancy** for detection.
-- A new **Anomaly-Attention** mechanism to compute the association discrepancy.
-- A **minimax strategy** to amplify the normal-abnormal distinguishability of the association discrepancy.
+## Baseline Overview
+This repository provides an implementation/reproduction of the baseline **[Anomaly Transformer]** based on the original paper:
+* **Paper Title:** *[Anomaly Transformer: Time Series Anomaly Detection with Association Discrepancy]*
+* **Authors:** *[Xu, Jiehui, et al]*
+* **Source / Links:** [https://arxiv.org/abs/2110.02642] | [https://github.com/thuml/Anomaly-Transformer]
+* **Role in Research:** Serves as a benchmark Transformer-based baseline to evaluate against our proposed method [**BiHyPE**].
 
-<p align="center">
-<img src=".\pics\structure.png" height = "350" alt="" align=center />
-</p>
-
-## Get Started
+## Implementation Details
 
 1. Install Python 3.6, PyTorch >= 1.4.0. 
-(Thanks Élise for the contribution in solving the environment. See this [issue](https://github.com/thuml/Anomaly-Transformer/issues/11) for details.)
-2. Download data. You can obtain four benchmarks from [Google Cloud](https://drive.google.com/drive/folders/1gisthCoE-RrKJ0j3KPV7xiibhHWT9qRm?usp=sharing). **All the datasets are well pre-processed**. For the SWaT dataset, you can apply for it by following its official tutorial.
+2. You can obtain five benchmarks from [Google Drive](https://drive.google.com/drive/folders/1PKHJIi2--liygyXCXiGmgj_RBbDtz6DD?usp=sharing). **All the datasets are well pre-processed by the authors of Anomaly Transformer**. You can download this data, then create the folder of dataset in the source code (valid dataset directory example: dataset/MSL, dataset/PSM, dataset/SMAP, dataset/SWaT, dataset/SMD).
 3. Train and evaluate. We provide the experiment scripts of all benchmarks under the folder `./scripts`. You can reproduce the experiment results as follows:
 ```bash
 bash ./scripts/SMD.sh
 bash ./scripts/MSL.sh
 bash ./scripts/SMAP.sh
 bash ./scripts/PSM.sh
+bash ./scripts/SWaT.sh
 ```
 
-Especially, we use the adjustment operation proposed by [Xu et al, 2018](https://arxiv.org/pdf/1802.03903.pdf) for model evaluation. If you have questions about this, please see this [issue](https://github.com/thuml/Anomaly-Transformer/issues/14) or email us.
-
-## Main Result
-
-We compare our model with 15 baselines, including THOC, InterFusion, etc. **Generally,  Anomaly-Transformer achieves SOTA.**
-
-<p align="center">
-<img src=".\pics\result.png" height = "450" alt="" align=center />
-</p>
-
-## Citation
-If you find this repo useful, please cite our paper. 
-
+Especially, you can reproduce across all datasets as follows:
+```bash
+bash ./scripts/Start.sh
 ```
-@inproceedings{
-xu2022anomaly,
-title={Anomaly Transformer: Time Series Anomaly Detection with Association Discrepancy},
-author={Jiehui Xu and Haixu Wu and Jianmin Wang and Mingsheng Long},
-booktitle={International Conference on Learning Representations},
-year={2022},
-url={https://openreview.net/forum?id=LzQQ89U1qm_}
-}
-```
+## Experimental Results on Anomaly Transformer Baseline
 
-## Contact
-If you have any question, please contact wuhx23@mails.tsinghua.edu.cn.
+The performance and anomaly score distribution of the Anomaly Transformer baseline were evaluated across 5 benchmark datasets:
+
+| Dataset | Figure of corresponding dataset |
+| :--- | :--- |
+| **MSL** | <img src="images/MSL_result.jpg" width="100%" alt="MSL Result"> |
+| **PSM** | <img src="images/PSM_result.jpg" width="100%" alt="PSM Result"> |
+| **SMAP** | <img src="images/SMAP_result.jpg" width="100%" alt="SMAP Result"> |
+| **SWaT** | <img src="images/SWaT_result.jpg" width="100%" alt="SWaT Result"> |
+| **SMD** | <img src="images/SMD_result.jpg" width="100%" alt="SMD Result"> |
