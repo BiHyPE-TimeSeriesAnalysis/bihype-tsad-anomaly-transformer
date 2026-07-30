@@ -136,34 +136,34 @@ py main.py \
     --win_size 64 \
     --lr 1e-5
 
-# echo "=============================="
-# echo "Train - SWaT - win_size=128"
-# echo "=============================="
-# py main.py \
-#     --anormly_ratio 0.5 \
-#     --num_epochs 3 \
-#     --batch_size 64 \
-#     --mode train \
-#     --dataset SWaT \
-#     --data_path dataset/SWaT \
-#     --input_c 51 \
-#     --output_c 51 \
-#     --win_size 128 \
-#     --lr 1e-5
+echo "=============================="
+echo "Train - SWaT - win_size=128"
+echo "=============================="
+py main.py \
+    --anormly_ratio 0.5 \
+    --num_epochs 3 \
+    --batch_size 64 \
+    --mode train \
+    --dataset SWaT \
+    --data_path dataset/SWaT \
+    --input_c 51 \
+    --output_c 51 \
+    --win_size 128 \
+    --lr 1e-5
 
-# echo "=============================="
-# echo "Test - SWaT - win_size=128"
-# echo "=============================="
-# py main.py \
-#     --anormly_ratio 0.5 \
-#     --num_epochs 3 \
-#     --batch_size 64 \
-#     --mode test \
-#     --dataset SWaT \
-#     --data_path dataset/SWaT \
-#     --input_c 51 \
-#     --output_c 51 \
-#     --win_size 128 \
-#     --lr 1e-5
+echo "=============================="
+echo "Test - SWaT - win_size=128"
+echo "=============================="
+py main.py \
+    --anormly_ratio 0.5 \
+    --num_epochs 3 \
+    --batch_size 64 \
+    --mode test \
+    --dataset SWaT \
+    --data_path dataset/SWaT \
+    --input_c 51 \
+    --output_c 51 \
+    --win_size 128 \
+    --lr 1e-5
 
 echo "All experiments completed."
