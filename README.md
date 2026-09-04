@@ -1,4 +1,4 @@
-# BiHyPE: Binary-based Hybrid Positional Encoding for Time-series Analysis
+# BiHyPE: Binary-based Hybrid Positional Encoding for Time-series Analysis - [Baseline: Anomaly Transformer]
 
 [![Python 3.6 (Legacy)](https://img.shields.io/badge/Python-3.6-yellow?style=flat&logo=python&logoColor=white)](https://www.python.org/)
 [![PyTorch >=1.4.0](https://img.shields.io/badge/PyTorch-%3E%3D1.4.0%2C_%3C%3D1.10.2-red?style=flat&logo=pytorch&logoColor=white)](https://pytorch.org/)
@@ -37,8 +37,8 @@ Five benchmark anomaly-detection datasets are used, all pre-processed by the ori
 
 ## Usage Instruction
 1. Install Python 3.6, PyTorch >= 1.4.0. 
-2. You can obtain five benchmarks from [Google Drive](https://drive.google.com/drive/folders/1PKHJIi2--liygyXCXiGmgj_RBbDtz6DD?usp=sharing). **All the datasets are well pre-processed by the authors of Anomaly Transformer**. You can download this data, then create the folder of dataset in the source code (valid dataset directory example: dataset/MSL, dataset/PSM, dataset/SMAP, dataset/SWaT, dataset/SMD).
-3. Checkpoint: There are two types of checkpoint (1: For original, 2: For BiHyPE version on three random seeds), as summarized in [AnomalyTransformer_Checkpoints](https://drive.google.com/drive/folders/1U-ChjeNYKalNk6nODQ2eDtd_KPLba1F0?usp=drive_link).
+2. **Download the datasets** from the link in [Dataset Information](#dataset-information) and place them under `dataset/<NAME>` as described.
+3. **(Optional) Download checkpoints** from the link in [Code Information](#code-information) if you want to evaluate without retraining.
 4. Train and evaluate. We provide the experiment scripts of all benchmarks under the folder `./scripts`. You can reproduce the experiment results as follows:
 ```bash
 bash ./scripts/SMD.sh
@@ -65,6 +65,4 @@ Install dependencies with:
 ```bash
 pip install -r requirements.txt
 ```
-
----
 
