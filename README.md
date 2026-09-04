@@ -10,7 +10,7 @@ This repository provides an implementation/reproduction of the baseline **[Anoma
 * **Role in Research:** Benchmark baseline compared against the BiHyPE-integrated version of the same model, without modifying core architecture of original model.
 
 ## Dataset Information
-Five benchmark anomaly-detection datasets are used, all pre-processed by the original Anomaly Transformer authors:
+Five benchmark anomaly-detection datasets are used, all pre-processed by the original Anomaly Transformer authors (for MSL, PSM, SMAP and SMD), where SWaT come from the original DcDetector authors:
 
 | Dataset | Description |
 | :--- | :--- |
