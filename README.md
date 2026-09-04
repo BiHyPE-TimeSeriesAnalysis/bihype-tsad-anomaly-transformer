@@ -3,15 +3,39 @@
 [![Python 3.6 (Legacy)](https://img.shields.io/badge/Python-3.6-yellow?style=flat&logo=python&logoColor=white)](https://www.python.org/)
 [![PyTorch >=1.4.0](https://img.shields.io/badge/PyTorch-%3E%3D1.4.0%2C_%3C%3D1.10.2-red?style=flat&logo=pytorch&logoColor=white)](https://pytorch.org/)
 
-## Baseline Overview
-This repository provides an implementation/reproduction of the baseline **[Anomaly Transformer]** based on the original paper:
-* **Paper Title:** *[Anomaly Transformer: Time Series Anomaly Detection with Association Discrepancy]*
-* **Authors:** *[Xu, Jiehui, et al]*
-* **Source / Links:** [https://arxiv.org/abs/2110.02642] | [https://github.com/thuml/Anomaly-Transformer]
-* **Role in Research:** Serves as a benchmark Transformer-based baseline to evaluate against our proposed method [**BiHyPE**].
+## Description
+This repository provides an implementation/reproduction of the baseline **[Anomaly Transformer]**, based on the original paper "Anomaly Transformer: Time Series Anomaly Detection with Association Discrepancy" (Xu, Jiehui, et al). It serves as a benchmark Transformer-based baseline for evaluating our proposed method **BiHyPE**, on the Time-series Anomaly Detection (TSAD) task.
+* **Paper:**  [https://arxiv.org/abs/2110.02642]
+* **Original Source code:** [https://github.com/thuml/Anomaly-Transformer]
+* **Role in Research:** Benchmark baseline compared against the BiHyPE-integrated version of the same model, without modifying core architecture of original model.
 
-## Implementation Details
+## Dataset Information
+Five benchmark anomaly-detection datasets are used, all pre-processed by the original Anomaly Transformer authors:
 
+| Dataset | Description |
+| :--- | :--- |
+| **MSL** | Mars Science Laboratory rover telemetry |
+| **PSM** | Pooled Server Metrics |
+| **SMAP** | Soil Moisture Active Passive satellite telemetry |
+| **SWaT** | Secure Water Treatment testbed |
+| **SMD** | Server Machine Dataset |
+
+- **Download:** [Google Drive](https://drive.google.com/drive/folders/1PKHJIi2--liygyXCXiGmgj_RBbDtz6DD?usp=sharing)
+- **Directory layout:** after downloading, place each dataset under `dataset/<NAME>`, e.g. `dataset/MSL`, `dataset/PSM`, `dataset/SMAP`, `dataset/SWaT`, `dataset/SMD`.
+
+## Code Information
+
+- **Baseline model code:** implementation of the Anomaly Transformer architecture (association-discrepancy-based anomaly detection).
+- **Experiment scripts:** located under `./scripts/`, one per dataset (`MSL.sh`, `PSM.sh`, `SMAP.sh`, `SWaT.sh`, `SMD.sh`), plus `Start.sh` to run all datasets sequentially.
+- **Checkpoints:** two checkpoint types are provided —
+  1. **Original** Anomaly Transformer checkpoints.
+  2. **BiHyPE** version checkpoints, trained on three random seeds.
+  
+  Available at: [AnomalyTransformer_Checkpoints](https://drive.google.com/drive/folders/1U-ChjeNYKalNk6nODQ2eDtd_KPLba1F0?usp=drive_link)
+
+---
+
+## Usage Instruction
 1. Install Python 3.6, PyTorch >= 1.4.0. 
 2. You can obtain five benchmarks from [Google Drive](https://drive.google.com/drive/folders/1PKHJIi2--liygyXCXiGmgj_RBbDtz6DD?usp=sharing). **All the datasets are well pre-processed by the authors of Anomaly Transformer**. You can download this data, then create the folder of dataset in the source code (valid dataset directory example: dataset/MSL, dataset/PSM, dataset/SMAP, dataset/SWaT, dataset/SMD).
 3. Checkpoint: There are two types of checkpoint (1: For original, 2: For BiHyPE version on three random seeds), as summarized in [AnomalyTransformer_Checkpoints](https://drive.google.com/drive/folders/1U-ChjeNYKalNk6nODQ2eDtd_KPLba1F0?usp=drive_link).
@@ -28,14 +52,19 @@ Especially, you can reproduce across all datasets as follows:
 ```bash
 bash ./scripts/Start.sh
 ```
-## Experimental Results on Anomaly Transformer Baseline
 
-The performance and anomaly score distribution of the Anomaly Transformer baseline were evaluated across 5 benchmark datasets:
+## Requirements
 
-| Dataset | Figure of corresponding dataset |
-| :--- | :--- |
-| **MSL** | <img src="images/MSL_result.jpg" width="100%" alt="MSL Result"> |
-| **PSM** | <img src="images/PSM_result.jpg" width="100%" alt="PSM Result"> |
-| **SMAP** | <img src="images/SMAP_result.jpg" width="100%" alt="SMAP Result"> |
-| **SWaT** | <img src="images/SWaT_result.jpg" width="100%" alt="SWaT Result"> |
-| **SMD** | <img src="images/SMD_result.jpg" width="100%" alt="SMD Result"> |
+- Python 3.6
+- PyTorch >= 1.4.0, <= 1.10.2
+- NumPy, Pandas
+- scikit-learn
+
+Install dependencies with:
+
+```bash
+pip install -r requirements.txt
+```
+
+---
+
